@@ -6,16 +6,16 @@ local net = require "luci.model.network".init()
 local sys = require "luci.sys"
 local ifaces = sys.net:devices()
 
-m=Map("serverchand",translate("ServerChand"),
-translate("「Server酱-钉钉版」，英文名「ServerChan-DINGTalk」，是一款从服务器推送报警信息和日志到钉钉的工具。本插件由tty228/luci-app-serverchan创建，然后七年修改为钉钉机器人版自用。<br /><br />如果你在使用中遇到问题，请到这里提交：")
-.. [[<a href="https://github.com/zzsj0928/luci-app-serverchand" target="_blank">]]
+m=Map("pushbot",translate("PushBot"),
+translate("「全能推送」，英文名「PushBot」，是一款从服务器推送报警信息和日志到各平台的工具。<br>支持钉钉推送，企业微信推送，PushPlus推送。<br>本插件由tty228/luci-app-serverchan创建，然后七年修改为全能推送自用。<br /><br />如果你在使用中遇到问题，请到这里提交：")
+.. [[<a href="https://github.com/zzsj0928/luci-app-pushbot" target="_blank">]]
 .. translate("github 项目地址")
 .. [[</a>]]
 )
 
-m:section(SimpleSection).template  = "serverchand/status"
+m:section(SimpleSection).template  = "pushbot/status"
 
-s=m:section(NamedSection,"serverchand","serverchand",translate(""))
+s=m:section(NamedSection,"pushbot","pushbot",translate(""))
 s:tab("basic", translate("基本设置"))
 s:tab("content", translate("推送内容"))
 s:tab("crontab", translate("定时推送"))
@@ -24,28 +24,71 @@ s.addremove = false
 s.anonymous = true
 
 --基本设置
-a=s:taboption("basic", Flag,"serverchand_enable",translate("启用"))
+a=s:taboption("basic", Flag,"pushbot_enable",translate("启用"))
 a.default=0
 a.rmempty = true
 
-a=s:taboption("basic", ListValue,"send_tg",translate("推送模式"))
+a=s:taboption("basic", ListValue,"send_we",translate("推送模式"))
 a.default=""
 a.rmempty = true
 a:value("",translate("钉钉"))
-a:value("1",translate("Telegram"))
-a:value("2",translate("微信测试号版"))
+a:value("1",translate("企业微信"))
+a:value("3",translate("飞书"))
+a:value("4",translate("Bark"))
+a:value("2",translate("PushPlus"))
 
-a=s:taboption("basic", Value,"sckey",translate('Webhook'), translate("钉钉机器人 Webhook").."<br>调用代码获取<a href='https://ding-doc.dingtalk.com/' target='_blank'>点击这里</a><br><br>")
+a=s:taboption("basic", Value,"dd_webhook",translate('Webhook'), translate("钉钉机器人 Webhook").."<br>调用代码获取<a href='https://ding-doc.dingtalk.com/' target='_blank'>点击这里</a><br><br>")
 a.rmempty = true
-a:depends("send_tg","")
+a:depends("send_we","")
 
-a=s:taboption("basic", Value,"sctkey",translate('SCKEY'), translate("Serverchan Sckey").."<br>调用代码获取<a href='https://sct.ftqq.com/' target='_blank'>点击这里</a><br><br>")
+a=s:taboption("basic", Value, "we_webhook", translate("Webhook"),translate("企业微信机器人 Webhook").."<br>调用代码获取<a href='https://www.baidu.com/s?wd=%E4%BC%81%E4%B8%9A%E5%BE%AE%E4%BF%A1%20%E6%B7%BB%E5%8A%A0%E6%9C%BA%E5%99%A8%E4%BA%BA' target='_blank'>点击这里</a><br><br>")
 a.rmempty = true
-a:depends("send_tg","2")
+a:depends("send_we","1")
 
-a=s:taboption("basic", Value, "tgtoken", translate("tg推送链接"),translate("").."<br>目前公众号已停用，需要自建服务器<br>获取机器人<a href='https://github.com/Fndroid/tg_push_bot' target='_blank'>点击这里</a><br>此处填入推送链接，如https://tgbot.lbyczf.com/sendMessage/:Token<br>")
+a=s:taboption("basic", Value,"pp_token",translate('PushPlus Token'), translate("PushPlus Token").."<br>调用代码获取<a href='http://pushplus.plus/doc/' target='_blank'>点击这里</a><br><br>")
 a.rmempty = true
-a:depends("send_tg","1")
+a:depends("send_we","2")
+
+a=s:taboption("basic", ListValue,"pp_channel",translate('PushPlus Channel'))
+a.rmempty = true
+a:depends("send_we","2")
+a:value("wechat",translate("wechat：PushPlus微信公众号"))
+a:value("cp",translate("cp：企业微信应用"))
+a:value("webhook",translate("webhook：第三方webhook"))
+a:value("sms",translate("sms：短信"))
+a:value("mail",translate("mail：邮箱"))
+a.description = translate("第三方webhook：企业微信、钉钉、飞书、server酱<br>sms短信/mail邮箱：PushPlus暂未开放<br>具体channel设定参见：<a href='http://pushplus.plus/doc/extend/webhook.html' target='_blank'>点击这里</a>")
+
+a=s:taboption("basic", Value,"pp_webhook",translate('PushPlus Custom Webhook'), translate("PushPlus 自定义Webhook").."<br>第三方webhook或企业微信调用<br>具体自定义Webhook设定参见：<a href='http://pushplus.plus/doc/extend/webhook.html' target='_blank'>点击这里</a><br><br>")
+a.rmempty = true
+a:depends("pp_channel","cp")
+a:depends("pp_channel","webhook")
+
+a=s:taboption("basic", Flag,"pp_topic_enable",translate("PushPlus 一对多推送"))
+a.default=0
+a.rmempty = true
+a:depends("pp_channel","wechat")
+
+a=s:taboption("basic", Value,"pp_topic",translate('PushPlus Topic'), translate("PushPlus 群组编码").."<br>一对多推送时指定的群组编码<br>具体群组编码Topic设定参见：<a href='http://www.pushplus.plus/push2.html' target='_blank'>点击这里</a><br><br>")
+a.rmempty = true
+a:depends("pp_topic_enable","1")
+
+a=s:taboption("basic", Value,"fs_webhook",translate('WebHook'), translate("飞书 WebHook").."<br>调用代码获取<a href='https://www.feishu.cn/hc/zh-CN/articles/360024984973' target='_blank'>点击这里</a><br><br>")
+a.rmempty = true
+a:depends("send_we","3")
+
+a=s:taboption("basic", Value,"bark_token",translate('Bark Token'), translate("Bark Token").."<br>调用代码获取<a href='https://github.com/Finb/Bark' target='_blank'>点击这里</a><br><br>")
+a.rmempty = true
+a:depends("send_we","4")
+
+a=s:taboption("basic", Flag,"bark_srv_enable",translate("自建 Bark 服务器"))
+a.default=0
+a.rmempty = true
+a:depends("send_we","4")
+
+a=s:taboption("basic", Value,"bark_srv",translate('Bark Server'), translate("Bark 自建服务器地址").."<br>如https://your.domain:port<br>具体自建服务器设定参见：<a href='https://github.com/Finb/Bark' target='_blank'>点击这里</a><br><br>")
+a.rmempty = true
+a:depends("bark_srv_enable","1")
 
 a=s:taboption("basic", Value,"device_name",translate('本设备名称'))
 a.rmempty = true
@@ -72,6 +115,9 @@ a:depends("oui_data","1")
 a:depends("oui_data","2")
 a.description = translate("懒得做自动更新了，下载到内存中，重启会重新下载 <br/>若无梯子，还是下到机身吧")
 
+a=s:taboption("basic", Flag,"reset_regularly",translate("每天零点重置流量数据"))
+a.rmempty = true
+
 a=s:taboption("basic", Flag,"debuglevel",translate("开启日志"))
 a.rmempty = true
 
@@ -80,7 +126,7 @@ a.rmempty = true
 a.description = translate("<br/> 请输入设备 MAC 和设备别名，用“-”隔开，如：<br/> XX:XX:XX:XX:XX:XX-我的手机")
 
 --设备状态
-a=s:taboption("content", ListValue,"serverchand_ipv4",translate("ipv4 变动通知"))
+a=s:taboption("content", ListValue,"pushbot_ipv4",translate("ipv4 变动通知"))
 a.rmempty = true
 a.default=""
 a:value("",translate("关闭"))
@@ -89,7 +135,7 @@ a:value("2",translate("通过URL获取"))
 
 a = s:taboption("content", ListValue, "ipv4_interface", translate("接口名称"))
 a.rmempty = true
-a:depends({serverchand_ipv4="1"})
+a:depends({pushbot_ipv4="1"})
 for _, iface in ipairs(ifaces) do
 	if not (iface == "lo" or iface:match("^ifb.*")) then
 		local nets = net:get_interface(iface)
@@ -106,10 +152,10 @@ a.description = translate("<br/>一般选择 wan 接口，多拨环境请自行�
 a= s:taboption("content", Value, "ipv4_URL", "URL 地址")
 a.rmempty = true
 a.default = "members.3322.org/dyndns/getip"
-a:depends({serverchand_ipv4="2"})
+a:depends({pushbot_ipv4="2"})
 a.description = translate("<br/>会因服务器稳定性、连接频繁等原因导致获取失败<br/>如接口可以正常获取 IP，不推荐使用")
 
-a=s:taboption("content", ListValue,"serverchand_ipv6",translate("ipv6 变动通知"))
+a=s:taboption("content", ListValue,"pushbot_ipv6",translate("ipv6 变动通知"))
 a.rmempty = true
 a.default="disable"
 a:value("0",translate("关闭"))
@@ -118,7 +164,7 @@ a:value("2",translate("通过URL获取"))
 
 a = s:taboption("content", ListValue, "ipv6_interface", translate("接口名称"))
 a.rmempty = true
-a:depends({serverchand_ipv6="1"})
+a:depends({pushbot_ipv6="1"})
 for _, iface in ipairs(ifaces) do
 	if not (iface == "lo" or iface:match("^ifb.*")) then
 		local nets = net:get_interface(iface)
@@ -135,14 +181,14 @@ a.description = translate("<br/>一般选择 wan 接口，多拨环境请自行�
 a= s:taboption("content", Value, "ipv6_URL", "URL 地址")
 a.rmempty = true
 a.default = "v6.ip.zxinc.org/getip"
-a:depends({serverchand_ipv6="2"})
+a:depends({pushbot_ipv6="2"})
 a.description = translate("<br/>会因服务器稳定性、连接频繁等原因导致获取失败<br/>如接口可以正常获取 IP，不推荐使用")
 
-a=s:taboption("content", Flag,"serverchand_up",translate("设备上线通知"))
+a=s:taboption("content", Flag,"pushbot_up",translate("设备上线通知"))
 a.default=1
 a.rmempty = true
 
-a=s:taboption("content", Flag,"serverchand_down",translate("设备下线通知"))
+a=s:taboption("content", Flag,"pushbot_down",translate("设备下线通知"))
 a.default=1
 a.rmempty = true
 
@@ -269,11 +315,11 @@ e:depends("send_mode","2")
 e.inputstyle = "apply"
 function e.write(self, section)
 luci.sys.call("cbi.apply")
-        luci.sys.call("/usr/bin/serverchand/serverchand send &")
+        luci.sys.call("/usr/bin/pushbot/pushbot send &")
 end
 
 --免打扰
-a=s:taboption("disturb", ListValue,"serverchand_sheep",translate("免打扰时段设置"),translate("在指定整点时间段内，暂停推送消息<br/>免打扰时间中，定时推送也会被阻止。"))
+a=s:taboption("disturb", ListValue,"pushbot_sheep",translate("免打扰时段设置"),translate("在指定整点时间段内，暂停推送消息<br/>免打扰时间中，定时推送也会被阻止。"))
 a.rmempty = true
 
 a:value("",translate("关闭"))
@@ -288,8 +334,8 @@ a:value(t,translate("每天"..t.."点"))
 end
 a.default=0
 a.datatype=uinteger
-a:depends({serverchand_sheep="1"})
-a:depends({serverchand_sheep="2"})
+a:depends({pushbot_sheep="1"})
+a:depends({pushbot_sheep="2"})
 a=s:taboption("disturb", ListValue,"endtime",translate("免打扰结束时间"))
 a.rmempty = true
 
@@ -298,8 +344,8 @@ a:value(t,translate("每天"..t.."点"))
 end
 a.default=8
 a.datatype=uinteger
-a:depends({serverchand_sheep="1"})
-a:depends({serverchand_sheep="2"})
+a:depends({pushbot_sheep="1"})
+a:depends({pushbot_sheep="2"})
 
 a=s:taboption("disturb", ListValue,"macmechanism",translate("MAC过滤"))
 a:value("",translate("disable"))
@@ -309,17 +355,17 @@ a:value("interface",translate("仅通知此接口设备"))
 a.rmempty = true
 
 
-a = s:taboption("disturb", DynamicList, "serverchand_whitelist", translate("忽略列表"))
+a = s:taboption("disturb", DynamicList, "pushbot_whitelist", translate("忽略列表"))
 nt.mac_hints(function(mac, name) a :value(mac, "%s (%s)" %{ mac, name }) end)
 a.rmempty = true
 a:depends({macmechanism="allow"})
 
-a = s:taboption("disturb", DynamicList, "serverchand_blacklist", translate("关注列表"))
+a = s:taboption("disturb", DynamicList, "pushbot_blacklist", translate("关注列表"))
 nt.mac_hints(function(mac, name) a:value(mac, "%s (%s)" %{ mac, name }) end)
 a.rmempty = true
 a:depends({macmechanism="block"})
 
-a = s:taboption("disturb", ListValue, "serverchand_interface", translate("接口名称"))
+a = s:taboption("disturb", ListValue, "pushbot_interface", translate("接口名称"))
 a:depends({macmechanism="interface"})
 a.rmempty = true
 
